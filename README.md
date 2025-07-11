@@ -81,9 +81,28 @@ http://localhost:8080/api/v1/customers
 
 # Tutorial: Usando Confluent Kafka com VSCode e Spring Boot
 
+## ✅ **Visão Geral da Aplicação**
+
+A aplicação simula o fluxo de cadastro e validação de clientes usando arquitetura hexagonal, Kafka e MongoDB. O processo é dividido em APIs separadas:
+
+-   **API de Cliente**: recebe dados do cliente, salva no banco e envia o CPF para validação via Kafka.
+-   **API de Endereço**: retorna dados do endereço a partir do CEP.
+-   **API de Validação de CPF**: consome o CPF do Kafka, valida e devolve a resposta também via Kafka.
+-   **MongoDB**: armazena os dados dos clientes.
+-   **Kafka**: canal de comunicação assíncrona entre os serviços.
+
+![Kafka Diagrama](./doc/kafka.png)
+
+O fluxo segue:
+
+1. API de cliente envia CPF para Kafka.
+2. API de validação consome o CPF e devolve dados validados no outro tópico.
+3. A API de cliente escuta esse segundo tópico e atualiza no banco.
+4. Toda comunicação entre sistemas é desacoplada, via tópicos Kafka.
+
 ---
 
-**tutorial completo passo a passo** para rodar Kafka com Spring Boot usando Docker e visualizar tudo com o **Kafka UI** (interface web moderna). Isso funciona 100% no Ubuntu sem precisar da extensão Confluent do VSCode.
+**tutorial completo passo a passo** para rodar Kafka com Spring Boot usando Docker e visualizar tudo com o **Kafka UI** (interface web moderna).
 
 ---
 
@@ -91,28 +110,7 @@ http://localhost:8080/api/v1/customers
 
 ---
 
-## 🧱 1. Estrutura do projeto
-
-Crie uma estrutura de projeto como esta:
-
-```
-spring-kafka-hexagonal/
-├── docker-compose.yml
-├── src/
-│   └── main/
-│       └── java/
-│           └── com/example/kafka/
-│               ├── KafkaApplication.java
-│               └── producer/
-│                   └── MessageProducer.java
-│               └── consumer/
-│                   └── MessageConsumer.java
-└── application.yml
-```
-
----
-
-## ⚙️ 2. `docker-compose.yml`
+## ⚙️ 1. `docker-compose.yml`
 
 Atualize o arquivo
 docker-local/docker-compose.yml
@@ -190,7 +188,7 @@ networks:
 
 ---
 
-## 🚀 3. Subir o ambiente com Docker
+## 🚀 2. Subir o ambiente com Docker
 
 No terminal, execute:
 
@@ -313,6 +311,11 @@ spring.kafka.producer.value-serializer=org.apache.kafka.common.serialization.Str
 spring.kafka.admin.auto-create=true
 ```
 
+Para que serve esse bloco no application.properties?
+Essas configurações servem para informar ao Spring Boot como se comunicar com o Apache Kafka, tanto para enviar quanto para receber mensagens.
+PRODUTOR (Producer) Usado para ENVIAR mensagens para um tópico Kafka
+CONSUMIDOR (Consumer) Usado para LER mensagens de um tópico Kafka
+
 ### 🧪 Testando no Spring Boot
 
 Crie um `Producer` e um `Consumer` e envie mensagens para o tópico que você criou. Você verá essas mensagens aparecendo no `Kafka UI`.
@@ -324,6 +327,10 @@ Crie um `Producer` e um `Consumer` e envie mensagens para o tópico que você cr
 ### Classe de configuração `KafkaConsumerConfig.java`:
 
 ### Classe `KafkaConsumerConfig.java`:
+
+Essa classe serve para configurar um consumer customizado no Spring Boot, especialmente para deserializar mensagens em objetos Java (CustomerMessage).
+Isso quer dizer: quando a mensagem chegar, transforme o JSON direto em um objeto CustomerMessage.
+Você usará isso quando a aplicação principal receber os dados já validados (CPF, CEP, nome...) da "API externa de validação", via outro tópico Kafka.
 
 src/main/java/com/example/hexagonal/config/KafkaApplication.java
 
@@ -409,6 +416,10 @@ A idéia aqui é enviar para tópico do kafka o cpf e a aplicaçao fictícia sim
 ### Classe de configuração `KafkaProducerConfig.java`:
 
 ### Classe `KafkaProducerConfig.java`:
+
+@Configuration
+Diz ao Spring que esta classe contém beans (objetos gerenciados) que devem ser carregados no contexto da aplicação.
+O método cria um ProducerFactory, que é responsável por criar produtores Kafka com as configurações definidas.
 
 src/main/java/com/example/hexagonal/config/KafkaProducerConfig.java
 
