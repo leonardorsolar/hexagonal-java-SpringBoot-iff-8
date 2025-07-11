@@ -1,3 +1,5 @@
+# Em contrução
+
 # Tutorial Arquitetura Hexagonal - CRUD de Usuários | API + MongoDB (NoSQL) + Kafka (Mensageria)
 
 Aprenda na prática como aplicar a **Arquitetura Hexagonal** em microsserviços utilizando **Java**, **Spring Boot**, **MongoDB** e **Kafka**.
@@ -77,128 +79,43 @@ http://localhost:8080/api/v1/customers
 
 ---
 
-## 🔁 Etapa 7: tutorial usado cpdificar e para Rodar a aplicação
-
-Vamos agora realizar os seguintes passos para fazer tudo fucnionar:
-
-## ✏️ Parte 1: Criar o Bean do create
-
-src/main/java/com/example/hexagonal/config
-
-src/main/java/com/example/hexagonal/config/CreateCustomerConfig.java
-
-```java
-package com.example.hexagonal.config;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
-import com.example.hexagonal.application.usecase.CreateCustomerUseCase;
-import com.example.hexagonal.infrastructure.adapter.output.MongoCustomerRepositoryAdapter;
-import com.example.hexagonal.infrastructure.adapter.output.client.ViaCepAddressAdapter;
-
-@Configuration
-public class CreateCustomerConfig {
-
-    @Bean
-    public CreateCustomerUseCase createCustomerUseCase(
-            ViaCepAddressAdapter viaCepAddressAdapter,
-            MongoCustomerRepositoryAdapter mongoCustomerRepositoryAdapter) {
-        return new CreateCustomerUseCase(viaCepAddressAdapter, mongoCustomerRepositoryAdapter);
-    }
-
-}
-```
-
-## ✅ Criar um Endpoint GET para verificar os dados
-
-em src/main/java/com/example/hexagonal/infrastructure/adapter/input/controller/CustomerController.java
-
-método @GetMapping para listar os clientes está no caminho certo e incluir a injeção da dependência repository, que não está declarada no seu CustomerController
-
-Crie algo simples para listar os clientes:
-
-```java
-@Autowired
-    private MongoCustomerRepository repository; // 🔧 Adicionado aqui
-
-@GetMapping
-public List<CustomerEntity> listCustomers() {
-    return repository.findAll(); // ou usar uma porta e mapper se quiser manter arquitetura 100%
-}
-```
-
-# Criar um cliente
-
-```bash
-curl -X POST http://localhost:8080/api/v1/customers \
-  -H "Content-Type: application/json" \
-  -d '{
-        "name": "João Silva",
-        "cpf": "12345678900",
-        "zipCode": "01001-000"
-      }'
-```
-
-# Listar clientes
-
-curl http://localhost:8080/api/v1/customers
-
-## ✅ **✏️ Parte 2: Configurar o ambiente para rodar a aplicação**
-
-### 📌 O que faremos:
-
--   Instalar o **Docker** e o **Docker Compose**
--   Criar um arquivo `docker-compose.yml` para subir o MongoDB e o Mongo Express
--   Subir os containers
+# Tutorial: Usando Confluent Kafka com VSCode e Spring Boot
 
 ---
 
-### 🐧 **Passo 1: Instalar Docker no Linux**
+**tutorial completo passo a passo** para rodar Kafka com Spring Boot usando Docker e visualizar tudo com o **Kafka UI** (interface web moderna). Isso funciona 100% no Ubuntu sem precisar da extensão Confluent do VSCode.
 
-Veja na documentação como instalar
+---
 
-Verifique se está funcionando:
+# ✅ Tutorial Completo: Spring Boot + Kafka + Kafka UI com Docker
 
-```bash
-docker --version
+---
+
+## 🧱 1. Estrutura do projeto
+
+Crie uma estrutura de projeto como esta:
+
+```
+spring-kafka-hexagonal/
+├── docker-compose.yml
+├── src/
+│   └── main/
+│       └── java/
+│           └── com/example/kafka/
+│               ├── KafkaApplication.java
+│               └── producer/
+│                   └── MessageProducer.java
+│               └── consumer/
+│                   └── MessageConsumer.java
+└── application.yml
 ```
 
 ---
 
-### 🐳 **Passo 2: Instalar o Docker Compose**
+## ⚙️ 2. `docker-compose.yml`
 
-Veja na documentação como instalar
-
-Verifique a instalação:
-
-```bash
-docker-compose --version
-```
-
----
-
-### 📁 **Passo 3: Criar a pasta `docker-local`**
-
-No diretório raiz do seu projeto:
-
-```bash
-docker-local
-```
-
----
-
-### 📝 **Passo 4: Criar o arquivo `docker-compose.yml`**
-
-Crie o arquivo:
-
-```bash
-docker-compose.yml
-```
-
+Atualize o arquivo
 docker-local/docker-compose.yml
-
-Cole o seguinte conteúdo:
 
 ```yml
 version: "3"
@@ -214,7 +131,7 @@ services:
         # volumes:
         #   - /home/hexagonal/Desenvolvimento/Docker/Volumes/MongoDB:/data/db
         networks:
-            - mongo-compose-network
+            - hexagonal-network
 
     mongo-express:
         image: mongo-express
@@ -227,209 +144,556 @@ services:
             ME_CONFIG_MONGODB_ADMINPASSWORD: 123456789
             ME_CONFIG_MONGODB_URL: mongodb://root:123456789@mongo:27017/
         networks:
-            - mongo-compose-network
+            - hexagonal-network
+
+    zookeeper:
+        image: bitnami/zookeeper:latest
+        ports:
+            - "2181:2181"
+        environment:
+            - ALLOW_ANONYMOUS_LOGIN=yes
+        networks:
+            - hexagonal-network
+
+    kafka:
+        image: bitnami/kafka:3.4.0
+        ports:
+            - "9092:9092"
+        environment:
+            - KAFKA_ENABLE_KRAFT=no # <--- ESSENCIAL!
+            - KAFKA_BROKER_ID=1
+            - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+            - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+            - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+            - ALLOW_PLAINTEXT_LISTENER=yes
+        depends_on:
+            - zookeeper
+        networks:
+            - hexagonal-network
+
+    kafka-ui:
+        image: provectuslabs/kafka-ui
+        ports:
+            - "9080:8080"
+        environment:
+            - KAFKA_CLUSTERS_0_NAME=hexagonal
+            - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+        depends_on:
+            - kafka
+        networks:
+            - hexagonal-network
 
 networks:
-    mongo-compose-network:
+    hexagonal-network:
         driver: bridge
 ```
 
 ---
 
-### 🚀 **Passo 5: Subir o MongoDB com Docker**
+## 🚀 3. Subir o ambiente com Docker
 
-No terminal, dentro da pasta `docker-local`, rode:
+No terminal, execute:
 
 ```bash
 docker-compose up -d
 ```
 
----
+### 🔍 Acessando o Kafka UI
 
-### ✅ **Tudo pronto!**
+Depois, acesse o Kafka UI: [http://localhost:9080](http://localhost:9080)
 
-Você agora pode verificar no navegador:
+Abra no navegador:
 
--   MongoDB rodando em `localhost:27017`
-
-    -   Acessando no navegador você vera a informação:It looks like you are trying to access MongoDB over HTTP on the native driver port.
-
--   ## Interface web do Mongo Express em `http://localhost:8081`
-
-### ✅ Login do Mongo Express (interface web)
-
-1. Acesse no navegador:
-
-[http://localhost:8081](http://localhost:8081)
-
-2. Insira:
-
--   **Username:** `admin`
--   **Password:** `123456789`
-
----
-
-Se quiser, você pode alterar esses dados no `docker-compose.yml` e depois rodar novamente:
-
-```bash
-docker-compose down
-docker-compose up -d
+```
+http://localhost:9080
 ```
 
-Perfeito! Seu `docker-compose.yml` está configurado para usar autenticação com:
+-   Você verá o cluster com nome `hexagonal`.
+-   Navegue pelos **tópicos**, **consumidores**, **brokers** e **mensagens**.
+-   Pode **criar tópicos** como `tp-cpf-validation` diretamente na interface.
 
--   **Usuário:** `root`
--   **Senha:** `123456789`
--   **Host:** `localhost` (porta `27017` mapeada para o container)
+Para **criar um tópico no Kafka UI** com o nome `tp-cpf-validation`, siga este passo a passo no navegador:
 
 ---
 
-## ✅ Ajuste no `application.properties` ou `application.yml`
+### ✅ Passos para Criar o Tópico `tp-cpf-validation` no Kafka UI
 
-Para que sua aplicação Java consiga se autenticar no MongoDB, você **precisa configurar a URI de conexão com usuário e senha**, assim:
+1. **Acesse o Kafka UI**:
+   Abra [http://localhost:9080](http://localhost:9080) no navegador.
 
-### 👉 `src/main/resources/application.properties`
+2. **No menu lateral**, clique em **"Topics"**.
 
-```properties
+3. No canto superior direito, clique em **"add a topic"**.
+
+4. Preencha o formulário da seguinte maneira:
+
+    - **Topic Name**:
+      `tp-cpf-validation`
+
+    - **Number of Partitions**:
+      `1` (ou mais, se quiser paralelismo; geralmente `1` para testes)
+
+    - **Replication Factor**:
+      `1` (se você tiver só um broker, esse é o valor correto)
+
+    - **Cleanup policy**:
+      `Delete` (padrão; remove mensagens após o tempo definido)
+
+    - **Time to retain data (in ms)**:
+      Escolha, por exemplo, `7 days` (ou o tempo que fizer sentido pro seu caso)
+
+    - **Max size on disk in GB**:
+      Pode deixar como **Not Set** (sem limite)
+
+    - **Maximum message size in bytes**:
+      Deixe em branco, a menos que queira configurar um limite
+
+    - **Custom parameters**:
+      Ignore por enquanto, a menos que queira configurar propriedades específicas
+
+5. Clique em **"Create Topic"** no final do formulário.
+
+---
+
+Após isso, o tópico `tp-cpf-validation` estará criado e visível na lista de tópicos. Você poderá clicar nele para ver mensagens, produzir eventos, visualizar consumidores, etc.
+
+---
+
+---
+
+## 🌐 4. Configurar Spring Boot
+
+Confirme se já está instalado
+
+### Dependências no `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>org.springframework.kafka</groupId>
+    <artifactId>spring-kafka</artifactId>
+</dependency>
+```
+
+---
+
+### Arquivo `application.properties`:
+
+```
+seu-projeto/
+├── docker-local/
+│   └── docker-compose.yml
+├── src/
+│   └── main/
+│       ├── java/...
+│       └── resources/
+│           └── application.properties
+
+```
+
+atualize
+
+```bash
+spring.application.name=hexagonal
+# MongoDB
 spring.data.mongodb.uri=mongodb://root:123456789@localhost:27017
 spring.data.mongodb.database=hexagonal_db
+logging.level.org.springframework.web=DEBUG
+
+# Kafka
+spring.kafka.bootstrap-servers=localhost:9092
+spring.kafka.consumer.group-id=hexagonal-consumer-group
+spring.kafka.consumer.auto-offset-reset=earliest
+spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
+spring.kafka.consumer.value-deserializer=org.apache.kafka.common.serialization.StringDeserializer
+
+spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
+spring.kafka.producer.value-serializer=org.apache.kafka.common.serialization.StringSerializer
+
+# Criação automática de tópicos (opcional)
+spring.kafka.admin.auto-create=true
 ```
 
-> Se quiser mudar o nome do banco, como `hexagonal_db`, ele será criado automaticamente na primeira operação.
+### 🧪 Testando no Spring Boot
+
+Crie um `Producer` e um `Consumer` e envie mensagens para o tópico que você criou. Você verá essas mensagens aparecendo no `Kafka UI`.
 
 ---
 
-## ✅ Reinicie sua aplicação
+## 🧱 1. Configurar KafkaConsumerConfig e KafkaProducerConfig
 
-Depois de configurar isso, pare e reinicie sua aplicação com:
+### Classe de configuração `KafkaConsumerConfig.java`:
 
-```bash
-mvn clean spring-boot:run
-```
+### Classe `KafkaConsumerConfig.java`:
 
-ou
+src/main/java/com/example/hexagonal/config/KafkaApplication.java
 
-```bash
-./mvnw spring-boot:run
-```
+```java
+import com.arantes.hexagonal.adapters.in.consumer.message.CustomerMessage;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.support.serializer.JsonDeserializer;
 
----
+import java.util.HashMap;
+import java.util.Map;
 
-## 🧪 Verifique se está tudo certo
+import static org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG;
+import static org.apache.kafka.clients.consumer.ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG;
+import static org.apache.kafka.clients.consumer.ConsumerConfig.GROUP_ID_CONFIG;
+import static org.apache.kafka.clients.consumer.ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG;
+import static org.apache.kafka.clients.consumer.ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG;
 
-Você pode acessar o Mongo Express em:
+@EnableKafka
+@Configuration
+public class KafkaConsumerConfig {
 
-```
-http://localhost:8081
-```
+    @Bean
+    public ConsumerFactory<String, CustomerMessage> consumerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        props.put(GROUP_ID_CONFIG, "example");
+        props.put(KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
+        props.put(AUTO_OFFSET_RESET_CONFIG, "earliest");
+        return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), new JsonDeserializer<>(CustomerMessage.class));
+    }
 
-Usuário: `root`
-Senha: `123456789`
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, CustomerMessage> kafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, CustomerMessage> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory());
+        return factory;
+    }
 
-E verá os bancos criados, inclusive o `hexagonal_db` após a primeira chamada ao endpoint da sua API.
-
----
-
-Isso indica que **nenhum banco de dados de aplicação foi criado ainda**, apenas os bancos **padrão do MongoDB**:
-
--   `admin`
--   `config`
--   `local`
-
----
-
-### ✅ O que falta?
-
-O MongoDB **só cria o banco de dados e as coleções** quando você faz **uma operação real** — por exemplo, uma requisição HTTP `POST` que insere um cliente via sua API.
-
----
-
-### ✅ Teste agora seu endpoint `/api/v1/customers`
-
-Faça uma chamada `POST` com um `JSON` semelhante a este:
-
-```json
-{
-    "name": "João da Silva",
-    "cpf": "12345678901",
-    "zipCode": "01001000"
 }
 ```
 
-Você pode testar de várias formas:
+Antes de criar a configuração do consumidor, vamos criar um objeto que irá consumir o tópico para atualizar o cadastro do cliente.
 
-#### ✔️ Via `curl`:
+Acesse e crie o ConsumerMessage.java dentro da pasta consumer/message
 
-```bash
-curl -X POST http://localhost:8080/api/v1/customers \
-  -H "Content-Type: application/json" \
-  -d '{"name":"João da Silva", "cpf":"12345678901", "zipCode":"01001000"}'
-```
+src/main/java/com/example/hexagonal/infrastructure/adapter/input/consumer/message/CustomerMessage.java
 
-#### ✔️ Via Postman ou Insomnia:
+Este será o objeto que vou receber lá do kafta para atualizar os dados do cliente
 
--   URL: `http://localhost:8080/api/v1/customers`
--   Método: `POST`
--   Body (JSON):
+```java
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-```json
-{
-    "name": "João da Silva",
-    "cpf": "12345678901",
-    "zipCode": "01001000"
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class CustomerMessage {
+
+    private String id;
+
+    private String name;
+
+    private String zipCode;
+
+    private String cpf;
+
+    private Boolean isValidCpf;
+
 }
 ```
 
----
+iremos pegar esses dados e alterar no cadastro do cliente.
+A idéia aqui é enviar para tópico do kafka o cpf e a aplicaçao fictícia simular a validação do cpf retornando peo id do do cliente, comnome e o cep junto com o cpf também, falando se é válido ou não.
 
-### 🔍 Após isso...
+### Classe de configuração `KafkaProducerConfig.java`:
 
-1. Acesse novamente o **Mongo Express**: [http://localhost:8081](http://localhost:8081)
-2. Você verá um novo banco com o nome `hexagonal_db` (ou o nome que você definiu em `application.properties`)
-3. Dentro dele, verá a coleção (ex: `customers`)
+### Classe `KafkaProducerConfig.java`:
 
----
+src/main/java/com/example/hexagonal/config/KafkaProducerConfig.java
 
-Se quiser, envie aqui o conteúdo do seu `application.properties` e do DTO `CustomerRequestDTO` que eu posso confirmar se está tudo pronto para funcionar.
+```java
+package com.arantes.hexagonal.config;
 
-## 🧪 Verifique se está tudo certo
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.ProducerFactory;
 
-Você pode acessar o Mongo Express em:
+import java.util.HashMap;
+import java.util.Map;
 
+import static org.apache.kafka.clients.consumer.ConsumerConfig.GROUP_ID_CONFIG;
+import static org.apache.kafka.clients.producer.ProducerConfig.BOOTSTRAP_SERVERS_CONFIG;
+import static org.apache.kafka.clients.producer.ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG;
+import static org.apache.kafka.clients.producer.ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG;
+
+@Configuration
+public class KafkaProducerConfig {
+
+    @Bean
+    public ProducerFactory<String, String> producerFactory() {
+        Map<String, Object> configProps = new HashMap<>();
+        configProps.put(BOOTSTRAP_SERVERS_CONFIG,"localhost:9092");
+        configProps.put(GROUP_ID_CONFIG, "example");
+        configProps.put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configProps.put(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        return new DefaultKafkaProducerFactory<>(configProps);
+    }
+
+    @Bean
+    public KafkaTemplate<String, String> kafkaTemplate() {
+        return new KafkaTemplate<>(producerFactory());
+    }
+
+}
 ```
-http://localhost:8081
-```
 
-Usuário: `root`
-Senha: `123456789`
+## 🧱 2. Implementar o produtor e o consumidor
 
-E verá os bancos criados, inclusive o `hexagonal_db` após a primeira chamada ao endpoint da sua API.
-
----
-
-## ✏️ Parte 2: Subir a aplicação java
-
-Em src/main/java/com/example/hexagonal/HexagonalApplication.java clique em run
-
-CustomerController:
-
-src/main/java/com/example/hexagonal/infrastructure/adapter/input/controller/CustomerController.java
-
-Perfeito! Seu controller `CustomerController` está configurado corretamente para receber requisições `POST` no endpoint:
-
-```
-POST http://localhost:8080/api/v1/customers
-```
+A ideia seria:
+1- Inserir os dados do cliente na api principal
+2- Buscamos os dados do endereço na api CEP externa
+3- Salvamos na base dados no MongoDB
+4- Enviar um cpf do cliente para uma fila do kafka
+5- A Api externa CPF vai consumir a fila do kafka: ler o cpf, fazer as validações necessárias
+6- A Api externa CPF vai postar em outra fila os dados corretos do cliente
+7- A Api principal irá consumir os dados corretos do cliente que irá ler do tópico e dar update no cadastro do cliente
 
 ---
 
-## ✅ Como testar seu endpoint
+## Producer - Parate do envio do cpf para kafka
 
-Você pode testar com ferramentas como **Postman**, **Insomnia** ou via `curl` no terminal. Abaixo, exemplos práticos.
+Vamos inciar criando o produtor com o cpf que enviará para fila do kafka:
+
+vamos acessar o usecase CreateCustomerUseCase.java
+src/main/java/com/example/hexagonal/application/usecase/CreateCustomerUseCase.java
+
+Em CreateCustomerUseCase.java precisamos enviar daods para uma fila do kafka
+
+Assim, precisamos criar uma porta de saída para enviar a mensagem para o textrior (fila do kafka)
+
+Como a responsabilidade da porta é enviar o CPF para validação externa, o nome da interface deve refletir o que a aplicação precisa que seja feito, sem se preocupar com como isso será implementado.
+
+Sugestão de nome claro e expressivo: SendCpfForValidationOutputPort
+Melhor nome para a implementação (Adaptador):SendCpfForValidationKafkaAdapter
+
+```text
+hexagonal/
+├── application/
+│   └── port/
+│       └── output/
+│           └── SendCpfForValidationOutputPort.java
+├── infrastructure/
+│   └── messaging/
+│       └── kafka/
+│           └── SendCpfForValidationKafkaAdapter.java
+```
+
+Nome da interface: focado no o que (ação de negócio que precisa ser feita).
+Nome do adaptador: focado no como (implementação técnica específica).
+Isso mantém o sistema limpo, testável e desacoplado de detalhes técnicos.
+
+```java
+public class CreateCustomerUseCase implements CreateCustomerInputPort {
+
+    private final AddressLookupOutputPort addressLookupOutputPort;
+    private final CustomerPersistenceOutputPort customerPersistenceOutputPort;
+    private final SendCpfForValidationOutputPort sendCpfForValidationOutputPort;
+
+    public CreateCustomerUseCase(AddressLookupOutputPort addressLookupOutputPort,
+            CustomerPersistenceOutputPort customerPersistenceOutputPort, SendCpfForValidationOutputPort sendCpfForValidationOutputPort) {
+        this.addressLookupOutputPort = addressLookupOutputPort;
+        this.customerPersistenceOutputPort = customerPersistenceOutputPort;
+        this.sendCpfForValidationOutputPort = sendCpfForValidationOutputPort;
+
+    }
+
+    // this.cpfValidationMessagePort = cpfValidationMessagePort;
+
+    public void create(Customer customer, String zipCode) {
+        System.out.println("🎯 Entrou CreateCustomerUseCase: ");
+        var address = addressLookupOutputPort.findByZipCode(zipCode);
+        System.out.println("🎯 address: " + address.getCity());
+        customer.setAddress(address);
+        System.out.println("🎯 Entrou CreateCustomerUseCase: " + customer.show());
+        customerPersistenceOutputPort.save(customer);
+        // cpfValidationMessagePort.sendCpfForValidation(customer.getCpf());
+        sendCpfForValidationOutputPort.send(customer.getCpf());
+    }
+
+}
+```
+
+Assim adiiconamos no usecase por injeção de dpendência a porta de saída e o métood de envio
+
+Agora precisamos da interface e do adaptador:
+
+### Interface do Produtor `SendCpfForValidationOutputPort.java`:
+
+```java
+package com.arantes.hexagonal.application.ports.out;
+
+public interface SendCpfForValidationOutputPort {
+
+    void send(String cpf);
+
+}
+```
+
+### Implementação da classe concreta do Produtor `SendCpfForValidationKafkaAdapter.java`:
+
+criaremos o adapter em kafka/SendCpfForValidationKafkaAdapter.java
+
+```text
+hexagonal/
+├── application/
+│   └── port/
+│       └── output/
+│           └── SendCpfForValidationOutputPort.java
+├── infrastructure/
+│   └── adapter/
+│         └── output/
+│                 └── kafka/
+│                      └── SendCpfForValidationKafkaAdapter.java
+```
+
+```java
+package com.arantes.hexagonal.adapters.out;
+
+import com.arantes.hexagonal.application.ports.out.SendCpfForValidationOutputPort;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Component;
+
+@Component
+public class SendCpfForValidationAdapter implements SendCpfForValidationOutputPort {
+
+    @Autowired
+    private KafkaTemplate<String, String> kafkaTemplate;
+
+    @Override
+    public void send(String cpf) {
+        kafkaTemplate.send("tp-cpf-validation", cpf);
+    }
+
+}
+```
+
+Envio para o kafka
+Basicamente injetamos o kafka template
+por parâmetros enviamos o tópico e os dados
+
+Precisamos atualizar o bean:
+
+src/main/java/com/example/hexagonal/config/CreateCustomerConfig.java
+
+```java
+@Configuration
+public class CreateCustomerConfig {
+
+    @Bean
+    public CreateCustomerUseCase createCustomerUseCase(
+            ViaCepAddressAdapter viaCepAddressAdapter,
+            MongoCustomerRepositoryAdapter mongoCustomerRepositoryAdapter,
+            SendCpfForValidationAdapter sendCpfForValidationAdapter) {
+        return new CreateCustomerUseCase(viaCepAddressAdapter, mongoCustomerRepositoryAdapter, sendCpfForValidationAdapter);
+    }
+
+}
+```
+
+## Consumer
+
+Agora criaremos o consumidor
+
+```text
+hexagonal/
+├── application/
+│   └── port/
+│       └── output/
+│           └── SendCpfForValidationOutputPort.java
+├── infrastructure/
+│   └── adapter/
+│         └── input/
+│                 └── consumer/
+│                       └── ReceuveValidatedCpfConsumer.java
+│
+```
+
+### Consumidor `ReceuveValidatedCpfConsumer.java`:
+
+Precisamso receber a mensagem que virá do kafka
+
+```java
+//package com.arantes.hexagonal.adapters.in.consumer;
+
+import com.arantes.hexagonal.adapters.in.consumer.mapper.CustomerMessageMapper;
+import com.arantes.hexagonal.adapters.in.consumer.message.CustomerMessage;
+import com.arantes.hexagonal.application.ports.in.UpdateCustomerInputPort;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+
+@Component
+public class ReceiveValidatedCpfConsumer {
+
+    @Autowired
+    private UpdateCustomerInputPort updateCustomerInputPort;
+
+    @Autowired
+    private CustomerMessageMapper customerMessageMapper;
+
+    @KafkaListener(topics = "tp-cpf-validated", groupId = "example")
+    public void receive(CustomerMessage customerMessage) {
+        var customer = customerMessageMapper.toCustomer(customerMessage);
+        updateCustomerInputPort.update(customer, customerMessage.getZipCode());
+    }
+
+}
+```
+
+Temos que criar o mapper:
+
+```java
+package com.arantes.hexagonal.adapters.in.consumer.mapper;
+
+import com.arantes.hexagonal.adapters.in.consumer.message.CustomerMessage;
+import com.arantes.hexagonal.application.core.domain.Customer;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
+@Mapper(componentModel = "spring")
+public interface CustomerMessageMapper {
+
+    @Mapping(target = "address", ignore = true)
+    Customer toCustomer(CustomerMessage customerMessage);
+
+}
+```
+
+é necessário implementar o updateCustomerInputPort
 
 ---
 
-### 🧪 1. Usando `curl` (linha de comando)
+## 🧪 5. Rodando tudo
+
+Você pode:
+
+1. Rodar o app com `mvn spring-boot:run`
+2. Enviar dados do cliente via post em `http://localhost:8081/api/v1/customers`
+3. visualizar a lista de clientes no navegador http://localhost:8080/api/v1/customers
+4. Acessar o banco de dadod do mongodb em http://localhost:8081 via Mongo Express
+5. Buscar o cliente por id http://localhost:8080/api/v1/customers/colar o id
+6. Acessar o kafka no navegador http://localhost:9080/ e verificar se foi enviado ( mostra só o binário)
+7. Testar o update em `http://localhost:8081/api/v1/customers`
+8. Testar a mensagem do kafka do cpf validado no tópico tc-cpf-validated porque o nosso consumidor fica escultando
+   (basta publicar a mensagem - publish single message ) Muda-se o cep e que o cpf está validado
+9. Testar a deleção do cliente
+
+### 🧪 Usando `curl` (linha de comando)
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/customers \
@@ -441,181 +705,11 @@ curl -X POST http://localhost:8080/api/v1/customers \
       }'
 ```
 
----
-
-### 🧪 2. Usando Postman (ou Insomnia)
-
--   Método: `POST`
--   URL: `http://localhost:8080/api/v1/customers`
--   Headers:
-
-    -   `Content-Type: application/json`
-
--   Body (raw, JSON):
-
-```json
-{
-    "name": "João Silva",
-    "cpf": "12345678900",
-    "zipCode": "01001-000"
-}
-```
-
----
-
-### ⚠️ Campos esperados
-
-O DTO `CustomerRequestDTO` deve conter pelo menos os campos `name`, `cpf` e `zipCode`. Certifique-se de que ele esteja anotado com validações como:
-
-```java
-public class CustomerRequestDTO {
-
-    @NotBlank
-    private String name;
-
-    @NotBlank
-    private String cpf;
-
-    @NotBlank
-    private String zipCode;
-
-    // getters e setters
-}
-```
-
----
-
-### ✅ O que esperar como resposta
-
-Como você está retornando:
-
-```java
-return ResponseEntity.ok().build();
-```
-
-A resposta será:
-
--   Status: `200 OK`
--   Sem corpo na resposta (`body` vazio)
-
----
-
-### 📌 Próximos passos:
-
-8. **Criação das configurações**
-
-    - Criando as configurações do Kafla
-
-9. **Criação do producer e consumer do kafka**
-
-10. **Configuração do ambiente para rodar a aplicação**
-
----
-
-Problemas com versões:
-
-## ✅ Solução definitiva e recomendada
-
-### 👉 Voltar para o **Java 17**, que é:
-
--   Suportado oficialmente pelo Spring Boot 3.3.x
--   Compatível com MapStruct, Lombok e o ecossistema em geral
-
----
-
-## ✅ Passos para mudar para Java 17 no Linux
-
-### 1. Instale o JDK 17 (se ainda não tiver):
+Para visualizar a lista de clientes, use no navegador
 
 ```bash
-sudo apt update
-sudo apt install openjdk-17-jdk
+http://localhost:8080/api/v1/customers
 ```
-
-### 2. Exporte o `JAVA_HOME` e atualize o `PATH`
-
-No terminal (vale para esta sessão):
-
-```bash
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-export PATH=$JAVA_HOME/bin:$PATH
-```
-
-Confirme com:
-
-```bash
-java -version
-# Deve mostrar: openjdk version "17"
-```
-
-```bash
-mvn -v
-# Deve mostrar: Java version: 17
-```
-
-### 3. Agora rode:
-
-```bash
-mvn clean install
-```
-
----
-
-## ✅ Tornar o Java 17 permanente (opcional)
-
-Se quiser que o Java 17 seja usado **sempre automaticamente**, adicione ao final do seu arquivo `~/.bashrc` ou `~/.zshrc`:
-
-```bash
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-export PATH=$JAVA_HOME/bin:$PATH
-```
-
-Depois execute:
-
-```bash
-source ~/.bashrc
-```
-
----
-
-## Se ainda quiser usar Java 21 no futuro:
-
--   Será necessário atualizar o **MapStruct** para uma versão **experimental ou futura** (quando disponível).
--   Ou usar plugins alternativos que não dependam de APIs internas do `javac`.
-
-# _Compilar e rodar sua aplicação Spring Boot _ Start no projeto
-
-### 🚀 **Subir o MongoDB com Docker**
-
-No terminal, dentro da pasta `docker-local`, rode:
-
-```bash
-docker-compose up -d
-```
-
-```bash
-docker ps
-```
-
-```bash
-docker-compose down
-docker-compose up -d
-```
-
-### **Rode a aplicação**
-
-Você pode executar diretamente com o Maven:
-
-```bash
-mvn spring-boot:run
-```
-
-sua aplicação está todando na porta:
-http://localhost:8080
-
-ou dar um run em src/main/java/com/example/hexagonal/HexagonalApplication.java
-
-## 🧪 Verifique se está tudo certo
 
 MongoDB rodando em `localhost:27017`
 
@@ -631,130 +725,30 @@ Perfeito! Seu `docker-compose.yml` está configurado para usar autenticação co
 -   **Senha:** `123456789`
 -   **Host:** `localhost` (porta `27017` mapeada para o container)
 
-# Testes:
-
-### 🧪 Usando `curl` (linha de comando)
-
-```bash
-curl -X POST http://localhost:8080/api/v1/customers \
-  -H "Content-Type: application/json" \
-  -d '{
-        "name": "João Silva",
-        "cpf": "12345678900",
-        "zipCode": "01001-000"
-      }'
-```
-
-Você está no caminho certo ao adicionar o `GET` para listar os clientes! Porém, há **um pequeno erro no código**: a variável `repository` não foi declarada ou injetada no `CustomerController`.
-
 ---
 
-## ✅ Correção Sugerida para litar clientes seguindo a arquitetura hexagonal
+## ✅ Pronto!
 
-Para que o método `listCustomers()` funcione, você precisa injetar o repositório Mongo (`MongoCustomerRepository`) no controller — ou, melhor ainda, **usar um serviço ou porta apropriada** para manter a arquitetura hexagonal limpa.
+Você agora tem um ambiente **Kafka completo** com Spring Boot e interface moderna.
 
-### 🔧 Solução rápida (para testes locais)
+## Extras:
 
-Se o objetivo for **verificar rapidamente os dados salvos**, você pode **injetar diretamente o repositório** (mesmo que isso quebre um pouco a separação de camadas — tudo bem para teste manual):
+Forçar remoção limpando todas as redes e volumes
+docker compose down --volumes --remove-orphans
+docker network prune -f
 
-```java
-@Autowired
-private com.example.hexagonal.infrastructure.adapter.output.repository.MongoCustomerRepository repository;
+docker compose down --volumes --remove-orphans
+docker network prune -f
 
-@GetMapping
-public List<CustomerEntity> listCustomers() {
-    return repository.findAll();
-}
-```
+## Biblioteca archunit
 
----
+https://www.archunit.org/userguide/html/000_Index.html
 
-### 🧼 Solução ideal (seguindo a arquitetura hexagonal)
+### Definindo acessos entre camadas
 
-1. Criar uma nova **porta de saída**:
+Teste para verificar que somente a camada de config poderá acessar a camada de adapatadores
+Assim só vamos permitir que acesse somnete a cadamada de dadapatadores a camada de configuração
 
-```java
-package com.example.hexagonal.application.port.output;
+### Garantindo que as classes estejam nos pacotes corretos
 
-import java.util.List;
-import com.example.hexagonal.domain.Customer;
-
-public interface LoadCustomerOutputPort {
-    List<Customer> findAll();
-}
-```
-
-2. Criar um **caso de uso** (opcional):
-
-```java
-package com.example.hexagonal.application.usecase;
-
-import java.util.List;
-import com.example.hexagonal.application.port.output.LoadCustomerOutputPort;
-import com.example.hexagonal.domain.Customer;
-import org.springframework.stereotype.Service;
-
-@Service
-public class ListCustomersUseCase {
-
-    private final LoadCustomerOutputPort loadCustomerOutputPort;
-
-    public ListCustomersUseCase(LoadCustomerOutputPort loadCustomerOutputPort) {
-        this.loadCustomerOutputPort = loadCustomerOutputPort;
-    }
-
-    public List<Customer> execute() {
-        return loadCustomerOutputPort.findAll();
-    }
-}
-```
-
-3. Implementar o adaptador no Mongo:
-
-```java
-@Component
-public class MongoCustomerRepositoryAdapter implements CustomerPersistenceOutputPort, LoadCustomerOutputPort {
-
-    @Autowired
-    private MongoCustomerRepository repository;
-
-    @Autowired
-    private CustomerEntityMapper mapper;
-
-    @Override
-    public void save(Customer customer) {
-        CustomerEntity entity = mapper.toCustomerEntity(customer);
-        repository.save(entity);
-    }
-
-    @Override
-    public List<Customer> findAll() {
-        return repository.findAll().stream()
-                .map(mapper::toCustomer)
-                .toList();
-    }
-}
-```
-
-4. Atualizar o `CustomerController`:
-
-```java
-@Autowired
-private ListCustomersUseCase listCustomersUseCase;
-
-@GetMapping
-public List<Customer> listCustomers() {
-    return listCustomersUseCase.execute();
-}
-```
-
----
-
-## ✅ Resumo
-
-| Abordagem                                                | Vantagem                      | Quando usar                    |
-| -------------------------------------------------------- | ----------------------------- | ------------------------------ |
-| Injetar o `MongoCustomerRepository` direto no controller | Rápido e prático              | Para testes rápidos e locais   |
-| Usar portas + casos de uso + mappers                     | Arquitetura limpa e escalável | Produção e manutenções futuras |
-
----
+### Garantindo que um pacote tenha determinado sufixo
